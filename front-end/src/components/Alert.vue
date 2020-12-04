@@ -1,5 +1,5 @@
 <template>
-  <div class="alert" role="alert" v-bind:class="'alert' + variant">
+  <div class="alert" role="alert" v-bind:class="'alert-' + variant">
     {{ message }}
   </div>
 </template>

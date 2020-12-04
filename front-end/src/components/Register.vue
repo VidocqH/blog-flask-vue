@@ -76,7 +76,7 @@ export default {
         this.registerForm.passwordError = null
       }
 
-      const path = 'http://localhost:5000/api/users'
+      const path = '/users'
       const payload = {
         username: this.registerForm.username,
         email: this.registerForm.email,

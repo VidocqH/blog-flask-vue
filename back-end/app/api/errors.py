@@ -17,9 +17,9 @@ def bad_request(message):
 
 @bp.app_errorhandler(404)
 def not_found_error(error):
-    return error_rsponse(404)
+    return error_response(404)
 
 @bp.app_errorhandler(500)
 def internal_error(error):
     db.session.rollback()
-    return error_rsponse(500)
+    return error_response(500)

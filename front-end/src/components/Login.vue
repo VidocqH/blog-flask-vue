@@ -33,15 +33,10 @@
 </template>
 
 <script>
-import axios from 'axios'
-import Alert from './Alert'
 import store from '../store'
 
 export default {
   name: 'Login',
-  components: {
-    alert: Alert
-  },
   data() {
     return {
       sharedState: store.state,
@@ -81,8 +76,8 @@ export default {
         return false
       }
 
-      const path = 'http://localhost:5000/api/tokens'
-      axios.post(path, {}, {
+      const path = '/tokens'
+      this.$axios.post(path, {}, {
         auth: {
           'username': this.loginForm.username,
           'password': this.loginForm.password
@@ -90,8 +85,10 @@ export default {
       }).then((response) => {
         // handle success
         window.localStorage.setItem('madblog-token', response.data.token)
-        store.resetNotNewAction()
         store.loginAction()
+
+        const name = JSON.parse(atob(response.data.token.split('.')[1])).name
+        this.$toasted.success(`Welcome ${name}!`, {icon: 'fingerprint'})
 
         if (typeof this.$route.query.redirect == 'undefined') {
           this.$router.push('/')
