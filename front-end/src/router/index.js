@@ -6,6 +6,7 @@ import Login from '@/components/Login'
 import Register from '@/components/Register'
 import Profile from '@/components/Profile'
 import EditProfile from '@/components/EditProfile'
+import Post from '@/components/Post'
 
 Vue.use(Router)
 
@@ -49,6 +50,11 @@ const router = new Router({
       meta: {
         requiresAuth: true
       }
+    },
+    {
+      path: '/post/:id',
+      name: 'Post',
+      component: Post
     }
   ]
 })

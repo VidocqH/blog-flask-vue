@@ -40,6 +40,7 @@ class User(PaginatedAPIMixin, db.Model):
     about_me = db.Column(db.Text())
     member_since = db.Column(db.DateTime(), default=datetime.utcnow)
     last_seen = db.Column(db.DateTime(), default=datetime.utcnow)
+    posts = db.relationship('Post', backref='author', lazy='dynamic', cascade='all, delete-orphan')
 
     def __repr__(self):
         return '<User {}>'.format(self.username)
@@ -109,3 +110,48 @@ class User(PaginatedAPIMixin, db.Model):
     def ping(self):
         self.last_seen = datetime.utcnow()
         db.session.add(self)
+
+class Post(PaginatedAPIMixin, db.Model):
+    __tablename__ = 'posts'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255))
+    summary = db.Column(db.Text)
+    body = db.Column(db.Text)
+    timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+    views = db.Column(db.Integer, default=0)
+    author_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+    def __repr__(self):
+        return '<Post {}>'.format(self.title)
+
+    def from_dict(self, data):
+        for field in ['title', 'summary', 'body']:
+            if field in data:
+                setattr(self, field, data[field])
+
+    def to_dict(self):
+        data = {
+            'id': self.id,
+            'title': self.title,
+            'summary': self.summary,
+            'body': self.body,
+            'timestamp': self.timestamp,
+            'views': self.views,
+            'author': self.author.to_dict(),
+            '_links': {
+                'self': url_for('api.get_post', id=self.id),
+                'author_url': url_for('api.get_user', id=self.author_id)
+            }
+        }
+        return data
+
+    @staticmethod
+    def on_changed_body(target, value, oldvalue, initiator):
+        '''
+        target: Listen event happens
+        value: Listen where have changed
+        '''
+        if not target.summary:
+            target.summary = value[:200] + '  ... ...'
+
+db.event.listen(Post.body, 'set', Post.on_changed_body)
