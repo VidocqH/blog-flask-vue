@@ -10,7 +10,7 @@ import jwt
 class PaginatedAPIMixin(object):
     @staticmethod
     def to_collection_dict(query, page, per_page, endpoint, **kwargs):
-        resources = query.paginate(page, per_page, False)
+        resources = query.paginate(page, per_page)
         data = {
             'items': [item.to_dict() for item in resources.items],
             '_meta': {
@@ -30,6 +30,13 @@ class PaginatedAPIMixin(object):
         }
         return data
 
+followers = db.Table(
+    'followers',
+    db.Column('follower_id', db.Integer, db.ForeignKey('user.id')),
+    db.Column('followed_id', db.Integer, db.ForeignKey('user.id')),
+    db.Column('timestamp', db.DateTime, default=datetime.utcnow)
+)
+
 class User(PaginatedAPIMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), index=True, unique=True)
@@ -41,6 +48,13 @@ class User(PaginatedAPIMixin, db.Model):
     member_since = db.Column(db.DateTime(), default=datetime.utcnow)
     last_seen = db.Column(db.DateTime(), default=datetime.utcnow)
     posts = db.relationship('Post', backref='author', lazy='dynamic', cascade='all, delete-orphan')
+    followeds = db.relationship(
+        'User', secondary=followers,
+        primaryjoin=(followers.c.follower_id == id),
+        secondaryjoin=(followers.c.followed_id == id),
+        backref=db.backref('followers', lazy='dynamic'),
+        lazy='dynamic'
+    )
 
     def __repr__(self):
         return '<User {}>'.format(self.username)
@@ -110,6 +124,32 @@ class User(PaginatedAPIMixin, db.Model):
     def ping(self):
         self.last_seen = datetime.utcnow()
         db.session.add(self)
+
+    def is_following(self, user):
+        ''' return whether following '''
+        return self.followeds.filter(
+            followers.c.followed_id == user.id
+        ).count() > 0
+
+    def follow(self, user):
+        ''' Start following '''
+        if not self.is_following(user):
+            self.followeds.append(user)
+
+    def unfollow(self, user):
+        ''' Cancel following '''
+        if self.is_following(user):
+            self.followeds.remove(user)
+
+    @property
+    def followed_posts(self):
+        ''' Get all the posts of followers '''
+        followed = Post.query.join(
+            followers, (followers.c.followed_id == Post.author_id).filter(
+                followers.c.follower_id == self.id
+            )
+        )
+        return followed.order_by(Post.timestamp.desc())
 
 class Post(PaginatedAPIMixin, db.Model):
     __tablename__ = 'posts'

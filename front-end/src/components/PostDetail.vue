@@ -53,7 +53,7 @@
                 <span class="btn btn-xs u-btn-outline-aqua g-mr-10">评论</span>
               </li>
               <li v-if="post.author" class="list-inline-item">
-                <router-link v-bind:to="{ name: 'Profile', params: { id: post.author.id }}" class="u-link-v5 g-color-gray-dark-v4 g-color-primary--hover g-text-underline--none--hover"><span v-if="post.author.name">{{ post.author.name }}</span><span v-else>{{ post.author.username }}</span></router-link>
+                <router-link v-bind:to="{ path: `/user/${post.author.id}` }" class="u-link-v5 g-color-gray-dark-v4 g-color-primary--hover g-text-underline--none--hover"><span v-if="post.author.name">{{ post.author.name }}</span><span v-else>{{ post.author.username }}</span></router-link>
               </li>
               <li class="list-inline-item g-mx-10">/</li>
               <li class="list-inline-item">
@@ -108,13 +108,12 @@
       </div>
       <!-- End Sidebar -->
     </div>
-
   </div>
 </template>
 
 <script>
-import VueMarkdown from 'vue-markdown'
 import store from '../store'
+import VueMarkdown from 'vue-markdown'
 import hljs from 'highlight.js'
 const highlightCode = () => {
   let blocks = document.querySelectorAll('pre code')
@@ -126,7 +125,7 @@ import '../assets/jquery.sticky'
 
 export default {
   name: 'Post',
-  components:  {
+  components: {
     VueMarkdown
   },
   data() {
@@ -141,7 +140,7 @@ export default {
         titleError: null,
         bodyError: null
       },
-      showToc: true
+      showToc: True
     }
   },
   methods: {
@@ -210,10 +209,10 @@ export default {
     },
     onResetUpdate() {
       $('#updatePostModal').modal('hide')
-      this.$toasted.info('Cancelled, the post does not update.')
+      this.$toasted.info('Cancelled, the post is not update.', { icon: 'fingerprint' })
     },
     onDeletePost(post) {
-this.$swal({
+      this.$swal({
         title: "Are you sure?",
         text: "It will completely delete [ " + post.title + " ], be careful!",
         type: "warning",
@@ -247,23 +246,23 @@ this.$swal({
     },
     tocAllRight: function (tocHtmlStr) {
       $('.toc').find('ul').addClass('u-list-inline')
-      $('.toc ul li ul li').addClass('g-ml-15')
-      $('.toc ul li ul li ul li').addClass('g-ml-15')
-      $('.toc').find('a').addClass('u-link-v5 g-color-squa g-color-red--hover')
+      $('.toc ul li ul li').addClass('g-ml-15');
+      $('.toc ul li ul li ul li').addClass('g-ml-15');
+      $('.toc').find('a').addClass('u-link-v5 g-color-aqua g-color-red--hover')
     }
   },
-  created () {
+  created() {
     const post_id = this.$route.params.id
     this.getPost(post_id)
     $(document).ready(function() {
-      $("#editForm_body").markdown({
+      $("#editform_body").markdown({
         autofocus: false,
         savable: false,
         iconlibrary: 'fa',
         language: 'en'
       })
     })
-    $(document).ready(function(){
+    $(document).ready(function() {
       $("#sticker").sticky({ topSpacing: 10 })
     })
   },

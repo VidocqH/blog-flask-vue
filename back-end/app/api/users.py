@@ -1,10 +1,11 @@
 import re
-from flask import request, jsonify, url_for
+from flask import request, jsonify, url_for, g, current_app
 from app import db
 from app.api import bp
 from app.api.auth import token_auth
 from app.api.errors import bad_request
-from app.models import User
+from app.models import User, Post
+from datetime import datetime
 
 @bp.route('/users', methods=['POST'])
 def create_user():
@@ -52,7 +53,12 @@ def get_users():
 @token_auth.login_required
 def get_user(id):
     ''' return an user '''
-    return jsonify(User.query.get_or_404(id).to_dict())
+    user = User.query.get_or_404(id)
+    if g.current_user == user:
+        return jsonify(user.to_dict(include_email=True))
+    data = user.to_dict()
+    data['is_following'] = g.current_user.is_following(user)
+    return jsonify(data)
 
 @bp.route('/users/<int:id>', methods=['PUT'])
 @token_auth.login_required
@@ -90,3 +96,106 @@ def update_user(id):
 def delete_user(id):
     ''' Delete an user '''
     pass
+
+@bp.route('/follow/<int:id>', methods=['GET'])
+@token_auth.login_required
+def follow(id):
+    ''' Start follow '''
+    user = User.query.get_or_404(id)
+    if g.current_user == user:
+        return bad_request('You can\'t follow yourself.')
+    if g.current_user.is_following(user):
+        return bad_request('You have already followed this user.')
+    g.current_user.follow(user)
+    db.session.commit()
+    return jsonify({
+        'status': 'success',
+        'message': 'Followed %d.' % id
+    })
+
+@bp.route('/unfollow/<int:id>', methods=['GET'])
+@token_auth.login_required
+def unfollow(id):
+    user = User.query.get_or_404(id)
+    if g.current_user == user:
+        return bad_request('You can\'t unfollow yourself.')
+    if not g.current_user.is_following(user):
+        return bad_request('You have not follow this user.')
+    g.current_user.unfollow(user)
+    db.session.commit()
+    return jsonify({
+        'status': 'success',
+        'message': 'Unfollowed %d.' % id
+    })
+
+@bp.route('/users/<int:id>/followeds', methods=['GET'])
+@token_auth.login_required
+def get_followeds(id):
+    user = User.query.get_or_404(id)
+    page = request.args.get('page', 1, type=int)
+    per_page = min(
+        request.args.get(
+            'per_page', current_app.config['USERS_PER_PAGE'], type=int), 100)
+    data = User.to_collection_dict(
+        user.followeds, page, per_page, 'api.get_followeds', id=id)
+    # Add is_following tags for every followeds
+    for item in data['items']:
+        item['is_following'] = g.current_user.is_following(
+            User.query.get(item['id']))
+        # When the followed begun
+        res = db.engine.execute(
+            "select * from followers where follower_id={} and followed_id={}".
+            format(user.id, item['id']))
+        item['timestamp'] = datetime.strptime(
+            list(res)[0][2], '%Y-%m-%d %H:%M:%S.%f')
+    return jsonify(data)
+
+@bp.route('/users/<int:id>/followers', methods=['GET'])
+@token_auth.login_required
+def get_followers(id):
+    user = User.query.get_or_404(id)
+    page = request.args.get('page', 1, type=int)
+    per_page = min(
+        request.args.get(
+            'per_page', current_app.config['USERS_PER_PAGE'], type=int), 100)
+    data = User.to_collection_dict(
+        user.followers, page, per_page, 'api.get_followers', id=id)
+    # Add is_following tags for every followers
+    for item in data['items']:
+        item['is_following'] = g.current_user.is_following(
+            User.query.get(item['id']))
+        # When the follower begun
+        res = db.engine.execute(
+            "select * from followers where follower_id={} and followed_id={}".
+            format(item['id'], user.id))
+        item['timestamp'] = datetime.strptime(
+            list(res)[0][2], '%Y-%m-%d %H:%M:%S.%f')
+    return jsonify(data)
+
+@bp.route('/users/<int:id>/followeds-posts', methods=['GET'])
+def get_user_followed_posts(id):
+    user = User.query.get_or_404(id)
+    page = request.args.get('page', 1, type=int)
+    per_page = min(
+        request.args.get(
+            'per_page', current_app.config['POSTS_PER_PAGE'], type=int), 100)
+    data = Post.to_collection_dict(
+        user.followed_posts.order_by(Post.timestamp.desc()), page, per_page,
+        'api.get_user_followed_posts', id=id)
+    return jsonify(data)
+
+@bp.route('/users/<int:id>/posts', methods=['GET'])
+@token_auth.login_required
+def get_user_posts(id):
+    ''' return all the posts of user '''
+    user = User.query.get_or_404(id)
+    page = request.args.get('page', 1, type=int)
+    per_page = min(
+        request.args.get(
+            'per_page', current_app.config['POSTS_PER_PAGE'], type=int), 100)
+    data = Post.to_collection_dict(
+        user.posts.order_by(Post.timestamp.desc()), page, per_page,
+        'api.get_user_posts', id=id)
+    return jsonify(data)
+
+
