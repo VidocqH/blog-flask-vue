@@ -48,6 +48,7 @@ class User(PaginatedAPIMixin, db.Model):
     member_since = db.Column(db.DateTime(), default=datetime.utcnow)
     last_seen = db.Column(db.DateTime(), default=datetime.utcnow)
     posts = db.relationship('Post', backref='author', lazy='dynamic', cascade='all, delete-orphan')
+    comments = db.relationship('Comment', backref='author', lazy='dynamic', cascade="all, delete-orphan")
     followeds = db.relationship(
         'User', secondary=followers,
         primaryjoin=(followers.c.follower_id == id),
@@ -160,6 +161,7 @@ class Post(PaginatedAPIMixin, db.Model):
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     views = db.Column(db.Integer, default=0)
     author_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    comments = db.relationship('Comment', backref='post', lazy='dynamic', cascade='all, delete-orphan')
 
     def __repr__(self):
         return '<Post {}>'.format(self.title)
@@ -193,5 +195,32 @@ class Post(PaginatedAPIMixin, db.Model):
         '''
         if not target.summary:
             target.summary = value[:200] + '  ... ...'
+
+class Comment(PaginatedAPIMixin, db.Model):
+    __tablename__ = 'comments'
+    id = db.Column(db.Integer, primary_key=True)
+    body = db.Column(db.Text)
+    timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+    mark_read = db.Column(db.Boolean, default=False)
+    disabled = db.Column(db.Boolean, default=False)
+    author_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    post_id = db.Column(db.Integer, db.ForeignKey('posts.id'))
+    parent_id = db.Column(db.Integer, db.ForeignKey('comments.id', ondelete='CASCADE'))
+    parent = db.relationship('Comment', backref=db.backref('children', cascade='all, delete-orphan'), remote_side=[id])
+
+    def __repr__(self):
+        return '<Comment {}>'.format(self.id)
+
+    def get_descendants(self):
+        '''获取一级评论的所有子孙'''
+        data = set()
+
+        def descendants(comment):
+            if comment.children:
+                data.update(comment.children)
+                for child in comment.children:
+                    descendants(child)
+        descendants(self)
+        return data
 
 db.event.listen(Post.body, 'set', Post.on_changed_body)

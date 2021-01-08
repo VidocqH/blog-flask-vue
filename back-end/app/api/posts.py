@@ -85,3 +85,24 @@ def delete_post(id):
     db.session.delete(post)
     db.session.commit()
     return '', 204
+
+@bp.route('/posts/<int:id>/comments/', methods=['GET'])
+def get_post_comments(id):
+    '''返回当前文章下面的一级评论'''
+    post = Post.query.get_or_404(id)
+    page = request.args.get('page', 1, type=int)
+    per_page = min(
+        request.args.get(
+            'per_page', current_app.config['COMMENTS_PER_PAGE'], type=int), 100)
+    # 先获取一级评论
+    data = Comment.to_collection_dict(
+        post.comments.filter(Comment.parent==None).order_by(Comment.timestamp.desc()), page, per_page,
+        'api.get_post_comments', id=id)
+    # 再添加子孙到一级评论的 descendants 属性上
+    for item in data['items']:
+        comment = Comment.query.get(item['id'])
+        descendants = [child.to_dict() for child in comment.get_descendants()]
+        # 按 timestamp 排序一个字典列表
+        from operator import itemgetter
+        item['descendants'] = sorted(descendants, key=itemgetter('timestamp'))
+    return jsonify(data)
